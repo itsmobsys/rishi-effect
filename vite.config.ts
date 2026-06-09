@@ -5,7 +5,6 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/rishi-effect/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

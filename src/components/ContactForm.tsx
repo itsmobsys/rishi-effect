@@ -1,436 +1,392 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { Send, CheckCircle2, AlertTriangle, Mail, Phone, Calendar, Sparkles } from "lucide-react";
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-interface FormState {
-  name: string;
-  email: string;
-  interest: string;
-  message: string;
-}
+import React, { useState, useRef, useEffect } from "react";
+import { Copy, Mail, MessageSquare, Phone, CheckCircle2, Globe } from "lucide-react";
+import { AudioEngine } from "./AudioEngine";
 
-interface ConfettiPart {
-  id: number;
-  x: number;
-  y: number;
-  color: string;
-}
-
-export const ContactForm: React.FC = () => {
-  const [form, setForm] = useState<FormState>({
+export default function ContactForm() {
+  const [formData, setFormData] = useState({
     name: "",
-    email: "",
-    interest: "pr",
+    brand: "",
+    goal: "",
+    budget: "50-100k",
     message: ""
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const [errors, setErrors] = useState<Partial<FormState>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [confetti, setConfetti] = useState<ConfettiPart[]>([]);
+  // States for particle burst
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Helper to run comprehensive validation for "bad or wrong data" in real-time
-  const computeValidationError = (field: keyof FormState, value: string): string => {
-    const v = value.trim();
-    if (field === "name") {
-      if (v.length < 2) return "Name must be at least 2 characters.";
-      if (v.length > 50) return "Name must be under 50 characters.";
-      if (/[0-9]/.test(v)) return "Names cannot contain numbers/digits.";
-      if (/[@#$%^&*()_+={}\[\]|\\:;'"<>,.?/~`]/.test(v)) return "Name cannot contain special symbols.";
-      const repeats = /(.)\1\1/.test(v.toLowerCase());
-      const keyboardMash = /(asdf|qwer|zxcv|ghjk|hjkl|asdfasdf|test|admin|placeholder)/i.test(v);
-      if (repeats) return "Name contains excessive repeated letters.";
-      if (keyboardMash) return "Please enter a valid human name.";
-    } else if (field === "email") {
-      if (!v) return "Email address is required.";
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(v)) return "Please enter a valid business email.";
-      const invalidDomains = [
-        "test.com", "example.com", "dummy.com", "tempmail.com", "tempmail.org",
-        "mailinator.com", "yopmail.com", "dispostable.com", "trashmail.com", "user.com"
-      ];
-      const domain = v.toLowerCase().split("@")[1];
-      if (invalidDomains.includes(domain)) {
-        return "We do not accept disposable or dummy test domains.";
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Handling email copy
+  const handleCopyEmail = () => {
+    AudioEngine.playTick();
+    navigator.clipboard.writeText("rishi@therishieffect.com");
+    setCopied(true);
+    showToast("Copied email! Now actually send the mail.");
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  // Rotating Globe Canvas Render Loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    let angle = 0;
+
+    // Client nodes coordinates (India, Dubai, London, New York)
+    const clientNodes = [
+      { lat: 20.5937, lon: 78.9629, label: "India Base" }, // India
+      { lat: 25.2048, lon: 55.2708, label: "Dubai Hub" }, // Dubai
+      { lat: 51.5074, lon: -0.1278, label: "London Hub" }, // London
+      { lat: 40.7128, lon: -74.0060, label: "New York Hub" }, // US
+    ];
+
+    const resizeGlobe = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      canvas.width = parent.clientWidth;
+      canvas.height = parent.clientHeight || 300;
+    };
+
+    resizeGlobe();
+    window.addEventListener("resize", resizeGlobe);
+
+    const drawGlobe = () => {
+      const w = canvas.width;
+      const h = canvas.height;
+      if (w === 0 || h === 0) return;
+      ctx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2;
+      const radius = Math.min(w, h) * 0.4;
+
+      angle += 0.006; // Rotation speed
+
+      // 1. Draw outer glowing outline
+      ctx.strokeStyle = "rgba(255, 69, 0, 0.2)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Atmospheric glow around globe
+      const glowGrad = ctx.createRadialGradient(cx, cy, radius * 0.9, cx, cy, radius * 1.05);
+      glowGrad.addColorStop(0, "rgba(255, 69, 0, 0)");
+      glowGrad.addColorStop(1, "rgba(255, 69, 0, 0.08)");
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Draw Latitude & Longitude wires
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
+      ctx.lineWidth = 0.5;
+
+      // Draw horizontal parallels
+      for (let i = -4; i <= 4; i++) {
+        const yOffset = (i / 5) * radius;
+        const parallelRad = Math.sqrt(radius * radius - yOffset * yOffset);
+        
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + yOffset, parallelRad, parallelRad * 0.3, 0, 0, Math.PI * 2);
+        ctx.stroke();
       }
-      const emailLower = v.toLowerCase();
-      if (emailLower.startsWith("test@") || emailLower.startsWith("random@") || emailLower.startsWith("aaa@") || emailLower.startsWith("asdf@")) {
-        return "Please enter an authentic, active email address.";
+
+      // Draw vertical meridians
+      for (let i = 0; i < 4; i++) {
+        // Rotate meridians by active angle
+        const currentMeridianAngle = angle + (i * Math.PI) / 4;
+        const ellipseWidth = radius * Math.sin(currentMeridianAngle);
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, Math.abs(ellipseWidth), radius, 0, 0, Math.PI * 2);
+        ctx.stroke();
       }
-    } else if (field === "message") {
-      if (!v) return "Message is required.";
-      if (v.length < 15) return "Please provide more details (at least 15 characters).";
-      if (v.length > 2000) return "Message must be under 2000 characters.";
-      const repeats = /(.)\1\1\1\1/.test(v.toLowerCase());
-      const hasSpaces = v.includes(" ");
-      const longWords = v.split(/\s+/).some(word => word.length > 30);
-      const spamWords = /(free cash|casino|slot machine|viagra|instant rich|cheap bitcoin|cheap pharmacy)/i.test(v);
-      if (repeats) return "Message contains repetitious spam patterns.";
-      if (!hasSpaces && v.length > 25) return "Please enter standard spaced sentences.";
-      if (longWords) return "Message contains excessive lengthy character blocks.";
-      if (spamWords) return "Submission contains flagged spam keywords.";
-    }
-    return "";
-  };
 
-  // Real-time validations
-  const validateField = (field: keyof FormState, value: string) => {
-    const err = computeValidationError(field, value);
-    setErrors(prev => ({ ...prev, [field]: err }));
-  };
+      // 3. Draw client node spots with blinking amber glows
+      clientNodes.forEach((node, idx) => {
+        // Translate node coordinates to rotating sphere representation
+        // We use simple trig projection mapping based on latitude and longitude
+        const nodeAngle = (node.lon * Math.PI) / 180 + angle;
+        const cosLat = Math.cos((node.lat * Math.PI) / 180);
+        const sinLat = Math.sin((node.lat * Math.PI) / 180);
 
-  const handleInputChange = (field: keyof FormState, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-    validateField(field, value);
-  };
+        // Map relative 3D coordinate point depth
+        const x3d = radius * cosLat * Math.sin(nodeAngle);
+        const z3d = radius * cosLat * Math.cos(nodeAngle);
+        const y3d = radius * -sinLat; // Negative lat maps up on 2D screen coordinate
 
-  const triggerConfetti = () => {
-    const colors = ["#4169E1", "#6495ED", "#F8FAFC", "#000080"];
-    const burst: ConfettiPart[] = Array.from({ length: 45 }).map((_, i) => ({
-      id: i,
-      x: (Math.random() - 0.5) * 350,
-      y: (Math.random() - 0.5) * 200 - 100,
-      color: colors[Math.floor(Math.random() * colors.length)]
-    }));
-    setConfetti(burst);
-  };
+        // Only draw node index if it's on the front-facing hemisphere (z3d > 0)
+        if (z3d > 0) {
+          const px = cx + x3d;
+          const py = cy + y3d;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+          // Blinking glowing ripple size
+          const pulseFactor = Math.abs(Math.sin(Date.now() / 250 - idx));
+          const ringRad = 6 + pulseFactor * 12;
 
-    // Final validation check across all fields
-    const finalErrors: Partial<FormState> = {};
-    const nameErr = computeValidationError("name", form.name);
-    const emailErr = computeValidationError("email", form.email);
-    const messageErr = computeValidationError("message", form.message);
+          ctx.fillStyle = "rgba(0, 98, 255, 0.12)";
+          ctx.beginPath();
+          ctx.arc(px, py, ringRad, 0, Math.PI * 2);
+          ctx.fill();
 
-    if (nameErr) finalErrors.name = nameErr;
-    if (emailErr) finalErrors.email = emailErr;
-    if (messageErr) finalErrors.message = messageErr;
+          ctx.strokeStyle = `rgba(0, 98, 255, ${0.4 + pulseFactor * 0.5})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(px, py, 4, 0, Math.PI * 2);
+          ctx.stroke();
 
-    setErrors(finalErrors);
+          ctx.fillStyle = "#00D5FF";
+          ctx.beginPath();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fill();
 
-    if (Object.keys(finalErrors).length > 0) return;
-
-    setIsSubmitting(true);
-
-    fetch("/api/contact", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (res.ok) {
-          setIsSubmitting(false);
-          setIsSuccess(true);
-          triggerConfetti();
-          // Reset standard forms
-          setForm({ name: "", email: "", interest: "pr", message: "" });
-        } else {
-          setIsSubmitting(false);
-          if (data.errors) {
-            setErrors(data.errors);
-          } else {
-            setErrors({ message: data.error || "An error occurred while transmitting." });
-          }
+          // Anchor label text
+          ctx.fillStyle = "rgba(245, 240, 248, 0.45)";
+          ctx.font = "8px monospace";
+          ctx.fillText(node.label, px + 8, py - 4);
         }
-      })
-      .catch(() => {
-        setIsSubmitting(false);
-        setErrors({ message: "Network connection failure. Please try again." });
       });
+
+      animId = requestAnimationFrame(drawGlobe);
+    };
+
+    drawGlobe();
+
+    return () => {
+      window.removeEventListener("resize", resizeGlobe);
+      cancelAnimationFrame(animId);
+    };
+  }, []);
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) return;
+    
+    AudioEngine.playTick();
+    setSubmitting(true);
+
+    // Save lead details to localStorage
+    const newLead = {
+      id: Date.now().toString(),
+      name: formData.name,
+      brand: formData.brand,
+      goal: formData.goal,
+      budget: formData.budget,
+      message: formData.message,
+      createdAt: new Date().toISOString()
+    };
+    try {
+      const existingLeads = JSON.parse(localStorage.getItem("rishi_leads") || "[]");
+      existingLeads.unshift(newLead);
+      localStorage.setItem("rishi_leads", JSON.stringify(existingLeads));
+    } catch (err) {
+      console.error("Failed to save lead record", err);
+    }
+
+    // Simulate server dispatch latency
+    setTimeout(() => {
+      setSubmitting(false);
+      setSubmitted(true);
+      AudioEngine.playChimeChord();
+      showToast("SYSTEM ENGAGED. Deploying campaign strategy coordinates!");
+    }, 1500);
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch relative">
-      
-      {/* Left Column: Bold call-to-action & credentials */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7 }}
-        className="lg:col-span-5 flex flex-col justify-between py-2 text-left bg-zinc-900/35 border border-brand-border rounded-3xl p-6 sm:p-9 relative overflow-hidden"
-      >
-        {/* Gloss background element */}
-        <div className="absolute top-0 left-0 w-36 h-36 bg-royal-blue/5 blur-3xl pointer-events-none" />
+    <section 
+      id="contact"
+      className="py-24 px-4 md:px-12 bg-void relative border-t border-white/[0.04] z-20 min-h-screen flex items-center"
+    >
+      <div className="absolute top-0 right-10 w-80 h-80 bg-[#0062FF]/5 blur-[120px] rounded-full" />
+      <div className="absolute bottom-10 left-10 w-80 h-80 bg-[#C9A84C]/5 blur-[120px] rounded-full" />
 
+      {/* Floating Toast Notification Popups */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[9999] bg-[#111118] border border-[#0062FF] text-white px-5 py-4 rounded-xl shadow-[0_4px_30px_rgba(0,98,255,0.3)] animate-fadeIn flex items-center space-x-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping shrink-0" />
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider">{toastMessage}</span>
+        </div>
+      )}
+
+      <div className="max-w-3xl mx-auto w-full relative">
         <div>
-          <span className="text-[10px] font-mono tracking-widest text-[#94A3B8] uppercase font-bold border border-brand-border px-2.5 py-1 bg-brand-gray rounded-full">
-            Connect With Our Team
-          </span>
-
-          <h3 className="text-3xl sm:text-4xl font-serif italic text-white font-black mt-5 leading-tight">
-            Let's build <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-royal-blue to-royal-light font-extrabold text-glow-blue">
-              Your Legacy.
-            </span>
-          </h3>
-
-          <p className="text-xs sm:text-sm text-slate-400 mt-4 leading-relaxed font-sans">
-            Ready to establish dynamic market dominance, scale your digital authority, or manage critical brand reputations? Contact our advisory desk to start the conversation.
-          </p>
-
-          <div className="mt-8 space-y-4.5 font-sans">
-            <div className="flex gap-4 items-center">
-              <span className="w-9 h-9 rounded-full bg-brand-gray border border-brand-border text-royal-blue flex items-center justify-center shrink-0">
-                <Mail className="w-4 h-4" />
-              </span>
-              <div>
-                <span className="block text-[9px] font-mono text-slate-505 uppercase tracking-widest leading-none mb-1">
-                  General Desk
-                </span>
-                <span className="block text-xs sm:text-sm text-slate-205 hover:text-royal-blue transition-colors font-semibold">
-                  direct@therishieffect.com
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-4 items-center">
-              <span className="w-9 h-9 rounded-full bg-brand-gray border border-brand-border text-royal-blue flex items-center justify-center shrink-0">
-                <Phone className="w-4 h-4" />
-              </span>
-              <div>
-                <span className="block text-[9px] font-mono text-slate-505 uppercase tracking-widest leading-none mb-1">
-                  Primary Line
-                </span>
-                <span className="block text-xs sm:text-sm text-slate-205 font-semibold">
-                  +91 (022) 4890 2310
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-4 items-center">
-              <span className="w-9 h-9 rounded-full bg-brand-gray border border-brand-border text-royal-blue flex items-center justify-center shrink-0">
-                <Calendar className="w-4 h-4" />
-              </span>
-              <div>
-                <span className="block text-[9px] font-mono text-slate-505 uppercase tracking-widest leading-none mb-1">
-                  Active Locations
-                </span>
-                <span className="block text-xs sm:text-sm text-royal-blue font-bold uppercase tracking-wide">
-                  Serving Ambitious Brands Nationally
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Custom micro signature */}
-        <div className="mt-12 pt-6 border-t border-brand-border/60 text-2xs text-slate-505 font-mono flex justify-end items-center bg-brand-black/60 p-3.5 rounded-xl">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            ONLINE DESK ACTIVE
-          </span>
-        </div>
-      </motion.div>
-
-      {/* Right Column: Custom interactive form */}
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.7, delay: 0.15 }}
-        className="lg:col-span-7 bg-brand-gray border border-brand-border rounded-3xl p-6 sm:p-9 md:p-11 shadow-xl relative min-h-[500px] flex flex-col justify-center"
-      >
-        
-        {/* Render Confetti */}
-        {isSuccess && confetti.map((part) => (
-          <motion.div
-            key={part.id}
-            initial={{ opacity: 1, scale: 0.8, x: 0, y: 0 }}
-            animate={{
-              opacity: 0,
-              scale: [1, 1.2, 0.5],
-              x: part.x,
-              y: part.y,
-              rotate: Math.random() * 360
-            }}
-            transition={{ duration: 1.6, ease: "easeOut" }}
-            className="absolute left-1/2 top-1/2 w-2.5 h-2.5 pointer-events-none rounded-full z-40"
-            style={{ backgroundColor: part.color }}
-          />
-        ))}
-
-        <AnimatePresence mode="wait">
-          {!isSuccess ? (
-            <motion.form
-              key="contact-form"
-              onSubmit={handleSubmit}
-              initial={{ opacity: 1 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-6.5 text-left"
-            >
-              <h4 className="text-xs font-mono uppercase text-royal-blue tracking-widest font-extrabold flex items-center gap-1.5 mb-2">
-                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                GET IN TOUCH
-              </h4>
-
-              {/* Floating Input: Name */}
-              <div className="relative">
-                <input
-                  type="text"
-                  id="form-name"
-                  value={form.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  className={`w-full px-4.5 py-3.5 rounded-xl bg-brand-black/50 border outline-none text-slate-100 font-sans text-sm pt-5 pb-2.5 transition-colors peer ${
-                    errors.name ? "border-amber-600" : "border-brand-border hover:border-slate-700 focus:border-royal-blue"
-                  }`}
-                  placeholder=" "
-                  required
-                />
-                <label
-                  htmlFor="form-name"
-                  className={`absolute left-4.5 top-1/2 -translate-y-1/2 pointer-events-none font-mono text-2xs uppercase tracking-wider text-slate-550 transition-all ${
-                    form.name.trim().length > 0 ? "top-2.5 text-[9px] text-royal-blue" : "peer-placeholder-shown:top-1/2"
-                  }`}
-                >
-                  Full Name
-                </label>
-                {errors.name && (
-                  <span className="text-[10px] font-mono text-amber-500 flex items-center gap-1 mt-1">
-                    <AlertTriangle className="w-3 h-3" /> {errors.name}
-                  </span>
-                )}
-              </div>
-
-              {/* Floating Input: Email */}
-              <div className="relative">
-                <input
-                  type="email"
-                  id="form-email"
-                  value={form.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  className={`w-full px-4.5 py-3.5 rounded-xl bg-brand-black/50 border outline-none text-slate-100 font-sans text-sm pt-5 pb-2.5 transition-colors peer ${
-                    errors.email ? "border-amber-600" : "border-brand-border hover:border-slate-700 focus:border-royal-blue"
-                  }`}
-                  placeholder=" "
-                  required
-                />
-                <label
-                  htmlFor="form-email"
-                  className={`absolute left-4.5 top-1/2 -translate-y-1/2 pointer-events-none font-mono text-2xs uppercase tracking-wider text-slate-550 transition-all ${
-                    form.email.trim().length > 0 ? "top-2.5 text-[9px] text-royal-blue" : "peer-placeholder-shown:top-1/2"
-                  }`}
-                >
-                  Email Address
-                </label>
-                {errors.email && (
-                  <span className="text-[10px] font-mono text-amber-500 flex items-center gap-1 mt-1">
-                    <AlertTriangle className="w-3 h-3" /> {errors.email}
-                  </span>
-                )}
-              </div>
-
-              {/* Custom selection wrapper */}
-              <div>
-                <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2 font-bold select-none">
-                  What can we help you with?
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: "pr", label: "PR & Media" },
-                    { id: "branding", label: "Brand Identity" },
-                    { id: "strategy", label: "Business Strategy" },
-                    { id: "social_media", label: "Social Dominance" }
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => handleInputChange("interest", opt.id)}
-                      className={`py-3 px-2.5 rounded-xl border text-2xs font-mono font-bold uppercase transition-all tracking-wider text-center cursor-pointer focus:outline-none ${
-                        form.interest === opt.id
-                          ? "bg-royal-blue/15 border-royal-blue text-royal-blue shadow-[0_0_15px_rgba(65,105,225,0.15)]"
-                          : "bg-brand-black/40 border-brand-border hover:border-slate-700 text-slate-400 focus:outline-none"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+          
+          {/* DIRECT CALLS & CONTACT INPUTS */}
+          <div className="space-y-8">
+            
+            {/* Direct Connect Quick options grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              {/* Message WhatsApp direct button */}
+              <a 
+                href="https://wa.me/917043206427?text=Hey%20Rishi!%20I'm%20ready%20to%20grow%20my%20brand.%20Let's%20go."
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => AudioEngine.playTick()}
+                data-magnetic
+                className="bg-[#111118]/80 hover:bg-[#111118] border border-emerald-500/25 p-5 rounded-2xl flex items-center justify-between group cursor-pointer transition-all duration-300 relative overflow-hidden"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-emerald-500/10 rounded-xl relative">
+                    <MessageSquare className="w-5 h-5 text-emerald-500" />
+                    <span className="absolute top-0 right-0 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
+                  </div>
+                  <div>
+                    <span className="font-mono text-[9px] text-emerald-500 font-bold block uppercase tracking-wider mb-0.5">💬 Message WhatsApp</span>
+                    <span className="font-sans text-xs text-[#F5F0E8]/60 group-hover:text-white transition-colors duration-300">+91 70432 06427</span>
+                  </div>
                 </div>
-              </div>
+                <div className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded animate-pulse shrink-0 hidden sm:block">
+                  ● RESPONDS &lt; 1HR
+                </div>
+              </a>
 
-              {/* Floating Input: Message */}
-              <div className="relative">
-                <textarea
-                  id="form-message"
-                  value={form.message}
-                  onChange={(e) => handleInputChange("message", e.target.value)}
-                  rows={4}
-                  className={`w-full px-4.5 py-3.5 rounded-xl bg-brand-black/50 border outline-none text-slate-105 font-sans text-sm pt-7 pb-2.5 transition-colors resize-none peer ${
-                    errors.message ? "border-amber-600" : "border-brand-border hover:border-slate-700 focus:border-royal-blue"
-                  }`}
-                  placeholder=" "
-                  required
-                />
-                <label
-                  htmlFor="form-message"
-                  className={`absolute left-4.5 top-5 pointer-events-none font-mono text-2xs uppercase tracking-wider text-slate-550 transition-all ${
-                    form.message.trim().length > 0 ? "top-2.5 text-[9px] text-royal-blue" : "peer-placeholder-shown:top-5"
-                  }`}
-                >
-                  Describe your project or business needs
-                </label>
-                {errors.message && (
-                  <span className="text-[10px] font-mono text-amber-500 flex items-center gap-1 mt-1">
-                    <AlertTriangle className="w-3 h-3" /> {errors.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Submit CTA button */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-gradient-to-r from-royal-blue to-royal-light text-white font-mono text-xs font-black uppercase tracking-widest py-4 rounded-xl border border-royal-blue/30 hover:shadow-[0_0_20px_rgba(65,105,225,0.25)] transition-all cursor-pointer flex items-center justify-center gap-2"
+              {/* Copy email direct click button */}
+              <button 
+                onClick={handleCopyEmail}
+                data-magnetic
+                className="bg-[#111118]/80 hover:bg-[#111118] border border-[#C9A84C]/25 p-5 rounded-2xl flex items-center justify-between group cursor-pointer transition-all duration-300 text-left w-full"
               >
-                <span>{isSubmitting ? "SENDING INQUIRY..." : "SEND MESSAGE"}</span>
-                {!isSubmitting && <Send className="w-3.5 h-3.5" />}
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 bg-[#C9A84C]/10 rounded-xl">
+                    <Mail className="w-5 h-5 text-[#C9A84C]" />
+                  </div>
+                  <div>
+                    <span className="font-mono text-[9px] text-[#C9A84C] font-bold block uppercase tracking-wider mb-0.5">📋 CLICK TO COPY EMAIL</span>
+                    <span className="font-sans text-xs text-[#F5F0E8]/60 group-hover:text-white transition-colors duration-300">rishi@therishieffect.com</span>
+                  </div>
+                </div>
+                <Copy className="w-4 h-4 text-[#C9A84C]/40 group-hover:text-[#C9A84C] transition-colors duration-300" />
               </button>
-            </motion.form>
-          ) : (
-            <motion.div
-              key="success-screen"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", damping: 15 }}
-              className="text-center p-6"
-            >
-              {/* Illustrated checkmark draw animation */}
-              <div className="w-20 h-20 rounded-full bg-royal-blue/15 border-2 border-royal-blue flex items-center justify-center mx-auto mb-6 text-royal-blue relative">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [0, 1.2, 1] }}
-                  transition={{ delay: 0.2 }}
-                >
-                  <CheckCircle2 className="w-12 h-12 stroke-[1.5]" />
-                </motion.div>
-                <div className="absolute inset-0 rounded-full border border-royal-blue filter blur-sm opacity-50 font-black animate-pulse" />
-              </div>
 
-              <h4 className="text-xl sm:text-2xl font-serif italic font-extrabold text-[#F8FAFC]">
-                Message Sent.
+            </div>
+
+
+
+            {/* MAIN CONTACT SUBMISSION INPUT */}
+            <div className="bg-[#111118]/80 border border-white/[0.04] rounded-2xl p-6 md:p-8 relative">
+              <h4 className="font-display text-lg font-bold text-[#F5F0E8] mb-6 tracking-tight select-none">
+                SECURE CAMPAIGN DEPLOYMENT TELEPATHY
               </h4>
 
-              <p className="text-xs font-mono text-royal-blue uppercase tracking-widest mt-2">
-                Thank you for reaching out
-              </p>
+              {!submitted ? (
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-mono text-[9px] text-[#F5F0E8]/40 uppercase tracking-widest mb-1">YOUR NAME</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="e.g. Ristunjay Rao"
+                        className="w-full bg-void/50 border border-white/5 rounded-xl p-3.5 font-sans text-xs text-[#F5F0E8] placeholder-[#F5F0E8]/20 focus:outline-none focus:border-[#0062FF] transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[9px] text-[#F5F0E8]/40 uppercase tracking-widest mb-1">BRAND / CORPORATE ID</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={formData.brand}
+                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                        placeholder="e.g. Cosmic Slayers LLC"
+                        className="w-full bg-void/50 border border-white/5 rounded-xl p-3.5 font-sans text-xs text-[#F5F0E8] placeholder-[#F5F0E8]/20 focus:outline-none focus:border-[#0062FF] transition-colors"
+                      />
+                    </div>
+                  </div>
 
-              <p className="text-xs sm:text-sm text-slate-400 mt-4 max-w-sm mx-auto leading-relaxed font-sans">
-                Our team is reviewing your inquiry and will contact you within 24 hours to schedule a consultation.
-              </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-mono text-[9px] text-[#F5F0E8]/40 uppercase tracking-widest mb-1">PRIMARY CONVERSION GOAL</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={formData.goal}
+                        onChange={(e) => setFormData({ ...formData, goal: e.target.value })}
+                        placeholder="e.g. Scale organic follower leads"
+                        className="w-full bg-void/50 border border-white/5 rounded-xl p-3.5 font-sans text-xs text-[#F5F0E8] placeholder-[#F5F0E8]/20 focus:outline-none focus:border-[#0062FF] transition-colors"
+                      />
+                    </div>
 
-              <button
-                onClick={() => setIsSuccess(false)}
-                className="mt-8 px-6 py-2.5 border border-brand-border bg-brand-black hover:border-royal-blue hover:text-royal-blue text-slate-300 rounded-lg text-xs font-mono font-bold tracking-widest uppercase transition-colors cursor-pointer focus:outline-none"
-              >
-                Submit another inquiry
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
+                    <div>
+                      <label className="block font-mono text-[9px] text-[#F5F0E8]/40 uppercase tracking-widest mb-1">BUDGET RANGE (INR / MO)</label>
+                      <select 
+                        value={formData.budget}
+                        onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                        className="w-full bg-void/50 border border-white/5 rounded-xl p-3.5 font-sans text-xs text-[#F5F0E8]/80 focus:outline-none focus:border-[#0062FF] transition-colors"
+                      >
+                        <option value="Under 50k">Under ₹50,000</option>
+                        <option value="50-100k">₹50,000 - ₹100,000</option>
+                        <option value="100-250k">₹100,000 - ₹250,000</option>
+                        <option value="250k+">₹250,000+ // ULTIMATE INTENSITY</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-mono text-[9px] text-[#F5F0E8]/40 uppercase tracking-widest mb-1">WAR ROOM DISPATCH (BRIEF NOTES)</label>
+                    <textarea 
+                      rows={3}
+                      value={formData.message}
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      placeholder="Outline any key performance friction blocks..."
+                      className="w-full bg-void/50 border border-white/5 rounded-xl p-3.5 font-sans text-xs text-[#F5F0E8] placeholder-[#F5F0E8]/20 focus:outline-none focus:border-[#0062FF] transition-colors resize-none"
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    data-magnetic
+                    disabled={submitting}
+                    className="w-full py-4 bg-[#0062FF] hover:bg-[#0062FF]/90 text-white font-mono text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 shadow-[0_4px_20px_rgba(0,98,255,0.3)] disabled:opacity-50 transform hover:scale-[1.01]"
+                  >
+                    {submitting ? "ENCRYPTING COGNITIVE DISPATCH..." : "DEPLOY CAMPAIGN SPECIFICATIONS SYSTEM →"}
+                  </button>
+
+                </form>
+              ) : (
+                <div className="py-8 text-center space-y-4 animate-scaleIn">
+                  <CheckCircle2 className="w-16 h-16 text-[#C9A84C] mx-auto animate-pulse" />
+                  <h5 className="font-display text-xl font-bold text-[#F5F0E8] tracking-tight">COGNITIVE ENGAGEMENT SUCCESSFUL</h5>
+                  <p className="font-sans text-xs text-[#F5F0E8]/60 max-w-sm mx-auto leading-relaxed">
+                    Greetings, <strong className="text-white">{formData.name}</strong> of <strong className="text-white">{formData.brand}</strong>. Your performance metrics dispatch has updated the local host telemetry. Rishi's strategist circle will review shortly.
+                  </p>
+                  <button
+                    onClick={() => setSubmitted(false)}
+                    className="mt-4 font-mono text-[10px] text-[#0062FF] uppercase tracking-widest underline decoration-dotted decoration-1"
+                  >
+                    RE-DEPLOY DISPATCH GRID
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
   );
-};
+}

@@ -1,55 +1,53 @@
-export interface Service {
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export interface ServiceCard {
   id: string;
   title: string;
-  shortDescription: string;
-  longDescription: string;
-  iconName: string; // Used to select Lucide icons dynamically
-  metrics: { label: string; value: string }[];
-  features: string[];
-}
-
-export interface Vertical {
-  id: string;
-  name: string;
-  image: string; // Thematic background vector/image representation
-  tagline: string;
   description: string;
-  caseCount: number;
+  bullets: string[];
+  icon: string;
+  isLarge?: boolean;
 }
 
 export interface CaseStudy {
   id: string;
-  title: string;
-  client: string;
-  verticalId: string;
-  serviceId: string;
-  impactResult: string;
+  tag: string;
   challenge: string;
-  solution: string;
-  metrics: { label: string; value: string }[];
-  videoUrl?: string; // Showcase or showreel placeholder link
-  imageUrl: string;
-  featured: boolean;
+  result: string;
+  metric: string;
+  beforeImg: string;
+  afterImg: string;
+  brandName: string;
 }
 
-export interface Insight {
+export interface DmTestimonial {
   id: string;
-  title: string;
-  excerpt: string;
-  content: string;
-  category: "PR" | "Branding" | "Social Media" | "Strategy" | "Public Affairs";
-  readTime: string;
-  date: string;
-  author: string;
-  tags: string[];
+  senderName: string;
+  senderHandle: string;
+  avatarUrl: string;
+  message: string;
+  replyMessage: string;
+  timestamp: string;
+  stars: number;
 }
 
-export interface ContactMessage {
-  name: string;
-  email: string;
-  company: string;
-  vertical: string;
-  serviceNeeded: string;
-  message: string;
-  budget?: string;
+export interface QuizQuestion {
+  id: number;
+  text: string;
+  options: {
+    label: string;
+    points: number;
+    description: string;
+  }[];
+}
+
+export interface ProcessPhase {
+  id: string;
+  num: string;
+  title: string;
+  body: string;
+  icon: string;
 }
